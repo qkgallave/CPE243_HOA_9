@@ -1,0 +1,43 @@
+---
+- name: Setup Certificate Authority and Configure SSL
+  hosts: Server
+  become: true
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - openssl
+        - easy-rsa
+
+    - name: Generate CA key and certificate
+      command: |
+        openssl req -x509 -new -nodes -keyout /etc/ssl/private/ca.key -out /etc/ssl/certs/ca.crt -subj "/C=US/ST=State/L=City/O=Organization/CN=MyCA"
+      args:
+        creates: /etc/ssl/certs/ca.crt
+
+    - name: Create SSL certs directory
+      become: true
+      file:
+        path: /etc/ssl/certs
+        state: directory
+
+    - name: Generate SSL key and CSR
+      command: "openssl req -new -newkey rsa:2048 -nodes -keyout /etc/ssl/private/server.key -out /etc/ssl/private/server.csr -subj '/C=US/ST=State/L=City/O=Organization/CN=YourDomain'"
+      args:
+        creates:
+          - /etc/ssl/private/server.key
+          - /etc/ssl/private/server.csr
+
+    - name: Configure SSL for the server
+      openssl_certificate:
+        path: /etc/ssl/private/server.crt
+        privatekey_path: /etc/ssl/private/server.key
+        csr_path: /etc/ssl/private/server.csr
+        owner: root
+        group: root
+        mode: '0600'
+        state: present
+        provider: selfsigned
